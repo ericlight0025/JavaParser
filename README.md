@@ -53,6 +53,12 @@ mvn exec:java "-Dexec.args=--source examples/Entry.java --source examples/Servic
 | `--entry-method <方法名>` | 呼叫追蹤的起點 method 名稱 |
 | `--help` 或 `-h` | 顯示 CLI 說明 |
 
+跨 package 範例的呼叫方式如下，四個來源檔分屬 `app`、`service`、`data`、`logging` package：
+
+```powershell
+mvn exec:java "-Dexec.args=--source examples/multi-package/com/javalight/app/Entry.java --source examples/multi-package/com/javalight/service/Service.java --source examples/multi-package/com/javalight/data/Repository.java --source examples/multi-package/com/javalight/logging/Log.java --entry-class Entry --entry-method start"
+```
+
 例如只追蹤兩支檔案，可省略其他 `--source`：
 
 ```powershell
@@ -90,6 +96,23 @@ mvn test
 
 `L` 後面的數字是該 method 定義所在的原始碼行號。每一層呼叫增加兩個空格；相同父層底下的呼叫會對齊。
 
+### 跨 package 範例
+
+`examples/multi-package/` 以相同的多 method 呼叫流程示範跨 package 追蹤。呼叫端透過 import 呼叫不同 package 的類別；執行時仍需把每支來源檔都列在 `--source` 參數中。執行上一節的跨 package 命令，追蹤結果如下：
+
+```text
+1  Entry.start()  L7
+  1.1  Entry.validate()  L13
+    1.1.1  Service.normalize()  L13
+      1.1.1.1  Repository.sanitize()  L7
+  1.2  Service.check()  L8
+    1.2.1  Repository.query()  L4
+    1.2.2  Service.notifyUser()  L17
+      1.2.2.1  Log.audit()  L7
+      1.2.2.2  Entry.start()  L7  [循環，停止展開]
+  1.3  Log.write()  L4
+```
+
 ## 解析限制
 
 這是使用 JavaParser Core 的輕量靜態分析 MVP，沒有加入 Symbol Solver：
@@ -99,6 +122,8 @@ mvn test
 3. 同名候選 method 都會列出，依類別名稱與定義行號排序；目前不以參數型別區分多載。
 4. 透過變數呼叫、介面實作、繼承、import 與 Spring DI 的目標解析不保證準確。
 5. 輸入檔外的 method 不會追蹤。只解析你明確提供的來源檔，不會掃描整個 repository。
+
+範例中的跨 package 呼叫使用不同名稱的類別，因此可以依類別簡名配對。若不同 package 有同名類別，MVP 目前不會用完整 package 名稱消歧，可能同時列出同名候選 method。
 
 若要精準處理變數型別、多載或介面實作，可在確認 MVP 符合需求後，再評估加入 JavaParser Symbol Solver。
 
@@ -110,5 +135,5 @@ src/main/java/tw/javalight/calltrace/
   CallTraceService.java   Java 解析、索引與遞迴追蹤
   MethodInfo.java         Method 名稱、類別與行號
 src/test/.../CallTraceServiceTest.java
-examples/                 多檔、多 method 範例
+examples/                 同 package 與跨 package 的多檔、多 method 範例
 ```
