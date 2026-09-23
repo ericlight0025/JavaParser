@@ -21,7 +21,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** 只追蹤指定來源檔；無法唯一確認的呼叫會保留在結果中並標示原因。 */
+/** 只追蹤索引來源檔；無法唯一確認的呼叫會保留在結果中並標示原因。 */
 public final class CallTraceService {
     private final Map<String, List<MethodInfo>> methodsByClass = new HashMap<>();
     private final Map<String, Set<String>> classesBySimpleName = new HashMap<>();
@@ -162,7 +162,7 @@ public final class CallTraceService {
             return Resolution.unresolved("無法確認接收者類別（例如變數、繼承或動態派送）");
         }
         if (!classSources.containsKey(targetClass)) {
-            return Resolution.unresolved("來源清單未包含類別 " + targetClass);
+            return Resolution.unresolved("分析範圍未包含類別 " + targetClass);
         }
 
         List<MethodInfo> candidates = methodsByClass.getOrDefault(targetClass, List.of()).stream()
