@@ -37,10 +37,10 @@ mvn exec:java "-Dexec.args=--source examples/Entry.java --source examples/Servic
 
 ```text
 1  Entry.start()  L2
-1.1  Service.check()  L2
-1.1.1  Repository.query()  L2
-1.1.2  Entry.start()  L2  [循環，停止展開]
-1.2  Log.write()  L2
+  1.1  Service.check()  L2
+    1.1.1  Repository.query()  L2
+    1.1.2  Entry.start()  L2  [循環，停止展開]
+  1.2  Log.write()  L2
 ```
 
 ## MVP 的解析規則與限制

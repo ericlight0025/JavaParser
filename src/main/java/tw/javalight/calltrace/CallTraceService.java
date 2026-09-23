@@ -75,7 +75,9 @@ public final class CallTraceService {
     }
 
     private void append(StringBuilder output, String order, MethodInfo method, boolean cycle) {
-        output.append(order)
+        int depth = (int) order.chars().filter(character -> character == '.').count();
+        output.append("  ".repeat(depth))
+                .append(order)
                 .append("  ")
                 .append(method.displayName())
                 .append("  L")
