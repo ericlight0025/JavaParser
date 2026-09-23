@@ -1,0 +1,9 @@
+# 從專案根目錄執行：mvn exec:java "-Dexec.args=--config examples/simple.yaml"
+# 這裡的路徑以 examples/ 為基準。
+sources:
+  - Entry.java
+  - Service.java
+  - Repository.java
+  - Log.java
+entryClass: "Entry"
+entryMethod: "start"

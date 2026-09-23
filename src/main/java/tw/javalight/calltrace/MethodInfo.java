@@ -1,43 +1,58 @@
 package tw.javalight.calltrace;
 
 import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.body.Parameter;
 
 import java.nio.file.Path;
-import java.util.Objects;
+import java.util.Map;
+import java.util.stream.Collectors;
 
-/** 單一可追蹤的 method 定義及其來源資訊。 */
+/** 單一 method 的完整類別名稱、宣告參數與來源資訊。 */
 final class MethodInfo {
-    private final String className;
-    private final String methodName;
-    private final int line;
+    private final String qualifiedClassName;
+    private final String simpleClassName;
+    private final String packageName;
+    private final Map<String, String> imports;
     private final Path sourceFile;
     private final MethodDeclaration declaration;
 
-    MethodInfo(String className, MethodDeclaration declaration, Path sourceFile) {
-        this.className = className;
-        this.methodName = declaration.getNameAsString();
-        this.line = declaration.getBegin().map(position -> position.line).orElse(-1);
+    MethodInfo(String qualifiedClassName, String simpleClassName, String packageName,
+               Map<String, String> imports, MethodDeclaration declaration, Path sourceFile) {
+        this.qualifiedClassName = qualifiedClassName;
+        this.simpleClassName = simpleClassName;
+        this.packageName = packageName;
+        this.imports = Map.copyOf(imports);
         this.sourceFile = sourceFile;
         this.declaration = declaration;
     }
 
-    String className() { return className; }
-    String methodName() { return methodName; }
-    int line() { return line; }
+    String qualifiedClassName() { return qualifiedClassName; }
+    String simpleClassName() { return simpleClassName; }
+    String packageName() { return packageName; }
+    Map<String, String> imports() { return imports; }
+    String methodName() { return declaration.getNameAsString(); }
+    int line() { return declaration.getBegin().map(position -> position.line).orElse(-1); }
     Path sourceFile() { return sourceFile; }
     MethodDeclaration declaration() { return declaration; }
-    String displayName() { return className + "." + methodName + "()"; }
 
-    @Override
-    public boolean equals(Object other) {
-        if (this == other) return true;
-        if (!(other instanceof MethodInfo)) return false;
-        MethodInfo that = (MethodInfo) other;
-        return declaration == that.declaration;
+    String signature() {
+        return methodName() + "(" + declaration.getParameters().stream()
+                .map(this::parameterType)
+                .collect(Collectors.joining(",")) + ")";
     }
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(System.identityHashCode(declaration));
+    String displayName(boolean showPackage) {
+        return (showPackage ? qualifiedClassName : simpleClassName) + "." + signature();
+    }
+
+    boolean acceptsArity(int argumentCount) {
+        int parameterCount = declaration.getParameters().size();
+        boolean variableArguments = parameterCount > 0
+                && declaration.getParameter(parameterCount - 1).isVarArgs();
+        return variableArguments ? argumentCount >= parameterCount - 1 : argumentCount == parameterCount;
+    }
+
+    private String parameterType(Parameter parameter) {
+        return parameter.getType().asString() + (parameter.isVarArgs() ? "..." : "");
     }
 }

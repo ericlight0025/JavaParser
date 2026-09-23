@@ -2,32 +2,34 @@
 
 以 **JavaParser** 從指定入口 method 追蹤呼叫，依原始碼順序輸出階層、縮排與 method 定義行號。
 
-專案使用 Java 11，提供 Maven CLI。呼叫範圍由你透過 `--source` 指定；單一檔案可以有多個 method，多個檔案也可以各自有多個 method。
+專案使用 Java 11，透過 YAML 設定檔指定來源與入口，再由 CLI 執行；單一檔案可以有多個 method，多個檔案也可以各自有多個 method。
 
 ## 功能
 
-- 可重複指定 `--source`，輸入一支或多支 Java 原始碼檔
+- 在 YAML 中列出一支或多支 Java 原始碼檔
 - 在輸入檔中索引每個類別的多個 method
 - 指定入口類別和 method，往下列出被呼叫的 method
 - 依 method 呼叫在原始碼出現的位置排序
 - 以階梯縮排表示呼叫深度，並顯示 method 定義行號
 - 偵測目前呼叫路徑中的循環並停止展開
-- 無法在輸入檔中對應的呼叫（例如 JDK 或外部函式庫）會略過
+- 依 package、明確 import 和參數個數縮小呼叫目標；無法唯一確認時標示「未解析」
+- 來源清單未包含被呼叫的類別、呼叫變數或遇到同參數個數的多載時，保留呼叫位置並說明原因
 
 ## 架構圖
 
 ```mermaid
 flowchart TD
-    A[使用者提供多個 Java 檔與入口類別 / method] --> B[TraceCli 解析 CLI 參數]
-    B --> C[CallTraceService 使用 JavaParser 解析來源檔]
-    C --> D[建立 Class / Method 索引]
-    D --> E[找出入口 method 內的呼叫]
-    E --> F[依原始碼位置排序]
-    F --> G[解析輸入檔中可辨識的目標 method]
-    G --> H{目標是否在目前遞迴路徑中?}
-    H -- 否 --> I[遞迴追蹤並增加縮排]
-    H -- 是 --> J[標示循環並停止展開]
-    I --> K[輸出階梯狀呼叫清單與定義行號]
+    A[YAML 列出 Java 檔與入口] --> B[TraceCli --config]
+    B --> C[TraceConfig 驗證設定並解析來源路徑]
+    C --> D[CallTraceService 使用 JavaParser 建立類別 / method 索引]
+    D --> E[依原始碼順序追蹤呼叫]
+    E --> F{能唯一確認目標嗎?}
+    F -- 否 --> G[顯示未解析原因與呼叫位置]
+    F -- 是 --> H{目前路徑已有此 method?}
+    H -- 是 --> I[標示循環並停止展開]
+    H -- 否 --> J[遞迴追蹤下一層]
+    G --> K[輸出階梯狀呼叫清單]
+    I --> K
     J --> K
 ```
 
@@ -38,34 +40,45 @@ flowchart TD
 
 ## CLI 使用方式
 
-在專案根目錄開啟 PowerShell 或命令提示字元。每個待分析檔案各加一個 `--source`；`--entry-class` 和 `--entry-method` 指定追蹤起點。
+在專案根目錄開啟 PowerShell 或命令提示字元，執行內附的跨 package 設定檔：
 
 ```powershell
-mvn exec:java "-Dexec.args=--source examples/Entry.java --source examples/Service.java --source examples/Repository.java --source examples/Log.java --entry-class Entry --entry-method start"
+mvn exec:java "-Dexec.args=--config calltrace.yaml"
 ```
 
-參數說明：
+`calltrace.yaml` 的內容：
 
-| 參數 | 用途 |
+```yaml
+sources:
+  - examples/multi-package/com/javalight/app/Entry.java
+  - examples/multi-package/com/javalight/service/Service.java
+  - examples/multi-package/com/javalight/data/Repository.java
+  - examples/multi-package/com/javalight/logging/Log.java
+entryClass: "com.javalight.app.Entry"
+entryMethod: "start"
+```
+
+| YAML 欄位 | 用途 |
 | --- | --- |
-| `--source <Java檔>` | 要解析的 Java 檔案，可重複指定；只分析列出的檔案 |
-| `--entry-class <類別名>` | 呼叫追蹤的起點類別名稱 |
-| `--entry-method <方法名>` | 呼叫追蹤的起點 method 名稱 |
-| `--help` 或 `-h` | 顯示 CLI 說明 |
+| `sources` | 要解析的 Java 檔清單，至少一支；只追蹤列出的檔案 |
+| `entryClass` | 起點類別；同名類別請填完整 package 名稱。預設 package 與其他 package 同名時可用 `.Entry` |
+| `entryMethod` | 起點 method；若有多載，填宣告簽名，例如 `start(int)` |
 
-跨 package 範例的呼叫方式如下，四個來源檔分屬 `app`、`service`、`data`、`logging` package：
+`sources` 的相對路徑以 YAML 檔所在目錄為基準。也可填完整路徑；建議在 YAML 中使用 `/`，避免 Windows 反斜線被 YAML 當成跳脫字元。`entryClass`、`entryMethod` 建議加引號，以免名稱碰上 YAML 保留字。若欄位拼錯、檔案不存在或入口不唯一，CLI 會報錯。
 
-```powershell
-mvn exec:java "-Dexec.args=--source examples/multi-package/com/javalight/app/Entry.java --source examples/multi-package/com/javalight/service/Service.java --source examples/multi-package/com/javalight/data/Repository.java --source examples/multi-package/com/javalight/logging/Log.java --entry-class Entry --entry-method start"
-```
-
-例如只追蹤兩支檔案，可省略其他 `--source`：
+另一份單一 package 範例放在 `examples/simple.yaml`：
 
 ```powershell
-mvn exec:java "-Dexec.args=--source src/main/java/demo/Entry.java --source src/main/java/demo/Service.java --entry-class Entry --entry-method start"
+mvn exec:java "-Dexec.args=--config examples/simple.yaml"
 ```
 
-入口必須存在於列出的來源檔。路徑以執行命令時的目前目錄為基準；若檔案不在專案目錄，請使用完整路徑。
+查看 CLI 說明：
+
+```powershell
+mvn exec:java "-Dexec.args=--help"
+```
+
+先前的 `--source`、`--entry-class`、`--entry-method` 命令列參數仍可使用；新的範例以 YAML 為主。
 
 執行自動化測試：
 
@@ -75,7 +88,7 @@ mvn test
 
 ## 多 method 範例
 
-`examples/Entry.java`、`Service.java`、`Repository.java` 和 `Log.java` 各自包含多個 method。追蹤 `Entry.start()` 時，會只顯示從該入口實際可達的 method；未被呼叫的 method 不會列出。
+`examples/Entry.java`、`Service.java`、`Repository.java` 和 `Log.java` 各自包含多個 method。使用 `examples/simple.yaml` 追蹤 `Entry.start()` 時，會只顯示從該入口實際可達的 method；未被呼叫的 method 不會列出。
 
 範例包含同一檔案內的呼叫（`Entry.start()` → `Entry.validate()`）、跨檔案呼叫（`Entry` → `Service` → `Repository`），也包含多個兄弟呼叫及循環呼叫。
 
@@ -98,7 +111,7 @@ mvn test
 
 ### 跨 package 範例
 
-`examples/multi-package/` 以相同的多 method 呼叫流程示範跨 package 追蹤。呼叫端透過 import 呼叫不同 package 的類別；執行時仍需把每支來源檔都列在 `--source` 參數中。執行上一節的跨 package 命令，追蹤結果如下：
+`examples/multi-package/` 以相同的多 method 呼叫流程示範跨 package 追蹤。呼叫端透過 import 呼叫不同 package 的類別；`calltrace.yaml` 列出四支來源檔。執行 `--config calltrace.yaml` 後，追蹤結果如下：
 
 ```text
 1  Entry.start()  L7
@@ -117,23 +130,29 @@ mvn test
 
 這是使用 JavaParser Core 的輕量靜態分析 MVP，沒有加入 Symbol Solver：
 
-1. `ClassName.method()` 會配對輸入檔中同名類別及同名 method。
-2. 沒有 scope 的 `method()` 會先找同類別；找不到時才查輸入檔中的同名 method。
-3. 同名候選 method 都會列出，依類別名稱與定義行號排序；目前不以參數型別區分多載。
-4. 透過變數呼叫、介面實作、繼承、import 與 Spring DI 的目標解析不保證準確。
-5. 輸入檔外的 method 不會追蹤。只解析你明確提供的來源檔，不會掃描整個 repository。
+1. `ClassName.method()` 使用同 package 類別或明確 import 的完整類別名稱配對；完整限定的 `package.ClassName.method()` 也可配對。
+2. 沒有 scope 的 `method()` 只尋找目前類別；不再猜測其他類別的同名 method。
+3. 依參數個數（含 varargs）篩選多載；同個數仍有多個候選時，顯示「未解析：多載目標不唯一」，不猜測參數型別。
+4. 不同 package 的同名類別可以區分；輸出中若同時有同名類別，顯示完整類別名稱。
+5. 變數接收者、動態派送、繼承、萬用字元或 static import 尚未精準解析；這些呼叫會顯示為未解析。需要這類精準解析時可評估 JavaParser Symbol Solver。
+6. 只追蹤 YAML `sources` 明確列出的來源檔。清單外的呼叫會保留並標示未解析，不會掃描整個 repository。
 
-範例中的跨 package 呼叫使用不同名稱的類別，因此可以依類別簡名配對。若不同 package 有同名類別，MVP 目前不會用完整 package 名稱消歧，可能同時列出同名候選 method。
+未解析的行會顯示呼叫原始碼、呼叫位置和原因，例如：
 
-若要精準處理變數型別、多載或介面實作，可在確認 MVP 符合需求後，再評估加入 JavaParser Symbol Solver。
+```text
+  1.2  Service.check()  @ examples/Entry.java:L4  [未解析：來源清單未包含類別 Service]
+```
 
 ## 專案結構
 
 ```text
 src/main/java/tw/javalight/calltrace/
   TraceCli.java           CLI 參數與程式入口
+  TraceConfig.java        YAML 讀取、欄位與路徑驗證
   CallTraceService.java   Java 解析、索引與遞迴追蹤
   MethodInfo.java         Method 名稱、類別與行號
 src/test/.../CallTraceServiceTest.java
+calltrace.yaml             跨 package 執行設定
+examples/simple.yaml      單一 package 執行設定
 examples/                 同 package 與跨 package 的多檔、多 method 範例
 ```
