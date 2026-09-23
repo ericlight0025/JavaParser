@@ -43,17 +43,17 @@ flowchart TD
 在專案根目錄開啟 PowerShell 或命令提示字元，執行內附的跨 package 設定檔：
 
 ```powershell
-mvn exec:java "-Dexec.args=--config calltrace.yaml"
+mvn exec:java "-Dexec.args=--config config/calltrace.yaml"
 ```
 
-`calltrace.yaml` 的內容：
+`config/calltrace.yaml` 的內容：
 
 ```yaml
 sources:
-  - examples/multi-package/com/javalight/app/Entry.java
-  - examples/multi-package/com/javalight/service/Service.java
-  - examples/multi-package/com/javalight/data/Repository.java
-  - examples/multi-package/com/javalight/logging/Log.java
+  - ../examples/multi-package/com/javalight/app/Entry.java
+  - ../examples/multi-package/com/javalight/service/Service.java
+  - ../examples/multi-package/com/javalight/data/Repository.java
+  - ../examples/multi-package/com/javalight/logging/Log.java
 entryClass: "com.javalight.app.Entry"
 entryMethod: "start"
 ```
@@ -66,10 +66,10 @@ entryMethod: "start"
 
 `sources` 的相對路徑以 YAML 檔所在目錄為基準。也可填完整路徑；建議在 YAML 中使用 `/`，避免 Windows 反斜線被 YAML 當成跳脫字元。`entryClass`、`entryMethod` 建議加引號，以免名稱碰上 YAML 保留字。若欄位拼錯、檔案不存在或入口不唯一，CLI 會報錯。
 
-另一份單一 package 範例放在 `examples/simple.yaml`：
+另一份單一 package 範例放在 `config/simple.yaml`：
 
 ```powershell
-mvn exec:java "-Dexec.args=--config examples/simple.yaml"
+mvn exec:java "-Dexec.args=--config config/simple.yaml"
 ```
 
 查看 CLI 說明：
@@ -88,7 +88,7 @@ mvn test
 
 ## 多 method 範例
 
-`examples/Entry.java`、`Service.java`、`Repository.java` 和 `Log.java` 各自包含多個 method。使用 `examples/simple.yaml` 追蹤 `Entry.start()` 時，會只顯示從該入口實際可達的 method；未被呼叫的 method 不會列出。
+`examples/Entry.java`、`Service.java`、`Repository.java` 和 `Log.java` 各自包含多個 method。使用 `config/simple.yaml` 追蹤 `Entry.start()` 時，會只顯示從該入口實際可達的 method；未被呼叫的 method 不會列出。
 
 範例包含同一檔案內的呼叫（`Entry.start()` → `Entry.validate()`）、跨檔案呼叫（`Entry` → `Service` → `Repository`），也包含多個兄弟呼叫及循環呼叫。
 
@@ -111,7 +111,7 @@ mvn test
 
 ### 跨 package 範例
 
-`examples/multi-package/` 以相同的多 method 呼叫流程示範跨 package 追蹤。呼叫端透過 import 呼叫不同 package 的類別；`calltrace.yaml` 列出四支來源檔。執行 `--config calltrace.yaml` 後，追蹤結果如下：
+`examples/multi-package/` 以相同的多 method 呼叫流程示範跨 package 追蹤。呼叫端透過 import 呼叫不同 package 的類別；`config/calltrace.yaml` 列出四支來源檔。執行 `--config config/calltrace.yaml` 後，追蹤結果如下：
 
 ```text
 1  Entry.start()  L7
@@ -152,7 +152,8 @@ src/main/java/tw/javalight/calltrace/
   CallTraceService.java   Java 解析、索引與遞迴追蹤
   MethodInfo.java         Method 名稱、類別與行號
 src/test/.../CallTraceServiceTest.java
-calltrace.yaml             跨 package 執行設定
-examples/simple.yaml      單一 package 執行設定
+config/                    CLI YAML 設定檔
+  calltrace.yaml           跨 package 執行設定
+  simple.yaml              單一 package 執行設定
 examples/                 同 package 與跨 package 的多檔、多 method 範例
 ```

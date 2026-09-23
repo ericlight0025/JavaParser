@@ -1,9 +1,0 @@
-# 從專案根目錄執行：mvn exec:java "-Dexec.args=--config calltrace.yaml"
-# sources 的相對路徑以本 YAML 所在目錄為基準。
-sources:
-  - examples/multi-package/com/javalight/app/Entry.java
-  - examples/multi-package/com/javalight/service/Service.java
-  - examples/multi-package/com/javalight/data/Repository.java
-  - examples/multi-package/com/javalight/logging/Log.java
-entryClass: "com.javalight.app.Entry"
-entryMethod: "start"
