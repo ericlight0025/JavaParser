@@ -9,6 +9,10 @@ public final class TraceCli {
     private TraceCli() { }
 
     public static void main(String[] args) throws Exception {
+        if (Arguments.hasHelp(args)) {
+            System.out.println(Arguments.usage());
+            return;
+        }
         Arguments parsed = Arguments.parse(args);
         CallTraceService service = new CallTraceService();
         service.index(parsed.sourceFiles);
@@ -20,13 +24,17 @@ public final class TraceCli {
         private String entryClass;
         private String entryMethod;
 
+        private static boolean hasHelp(String[] args) {
+            for (String arg : args) {
+                if ("--help".equals(arg) || "-h".equals(arg)) return true;
+            }
+            return false;
+        }
+
         private static Arguments parse(String[] args) {
             Arguments result = new Arguments();
             for (int index = 0; index < args.length; index++) {
                 String option = args[index];
-                if ("--help".equals(option) || "-h".equals(option)) {
-                    throw new IllegalArgumentException(usage());
-                }
                 if (index + 1 >= args.length) throw new IllegalArgumentException("缺少 " + option + " 的值\n" + usage());
                 String value = args[++index];
                 switch (option) {
@@ -43,7 +51,12 @@ public final class TraceCli {
         }
 
         private static String usage() {
-            return "用法：--source <Java檔>（可重複） --entry-class <類別名> --entry-method <method名>";
+            return "用法：mvn exec:java \"-Dexec.args=--source <Java檔> [--source <Java檔> ...] --entry-class <類別名> --entry-method <method名>\"\n"
+                    + "選項：\n"
+                    + "  --source <Java檔>       要分析的 Java 檔案，可重複指定\n"
+                    + "  --entry-class <類別名>  呼叫追蹤的起點類別\n"
+                    + "  --entry-method <方法名> 呼叫追蹤的起點 method\n"
+                    + "  --help, -h              顯示此說明";
         }
     }
 }
